@@ -12,12 +12,11 @@ data-into-context approach is sufficient.
 
 from __future__ import annotations
 
-from types import SimpleNamespace
-
 from jinja2 import StrictUndefined, meta
 from jinja2.sandbox import SandboxedEnvironment
 
 from contextless.domain.models import Order
+from contextless.rendering.context import order_view
 
 # The only names a restricted template may reference. Everything else — including
 # Jinja globals such as ``range``/``cycler``/``lipsum`` and any configuration
@@ -33,15 +32,6 @@ _ENV.globals.clear()
 
 class RestrictedRenderError(Exception):
     """A restricted-render request must be rejected generically."""
-
-
-def _restricted_order(order: Order) -> SimpleNamespace:
-    """A minimal, safe view of the order exposing only allowlisted fields."""
-    return SimpleNamespace(
-        number=order.number,
-        customer_name=order.customer.name,
-        status=order.status,
-    )
 
 
 def render_restricted(body: str, order: Order) -> str:
@@ -60,6 +50,6 @@ def render_restricted(body: str, order: Order) -> str:
         raise RestrictedRenderError
 
     try:
-        return _ENV.from_string(body).render(order=_restricted_order(order))
+        return _ENV.from_string(body).render(order=order_view(order))
     except Exception as exc:  # sandbox SecurityError, undefined access, etc.
         raise RestrictedRenderError from exc
