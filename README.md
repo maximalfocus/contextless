@@ -8,7 +8,8 @@ input as **data** in the render **context** of a fixed template instead of compi
 This project is educational code intended to run only on a developer's machine. It hosts nothing,
 deploys nothing, and makes no production-readiness claim.
 
-> **Status:** the secure baseline is in place. The opt-in vulnerable contrast app, the SSTI escalation
+> **Status:** the secure baseline is complete — both the primary data-into-context endpoint and the
+> defence-in-depth restricted-render path. The opt-in vulnerable contrast app, the SSTI escalation
 > ladder, the comparison CLI, the full regression matrix, and the complete walkthrough are being added
 > in subsequent changes.
 
@@ -53,6 +54,25 @@ it substitutes only an allowlist of named placeholders (`order.number`, `order.c
 
 Authentication uses conspicuously fake, demo-only bearer tokens. Missing, malformed, and unknown
 credentials all receive the same generic `401`.
+
+## Two secure paths
+
+**Primary control — data into context (`POST /notifications/preview`).** User input is never compiled
+as a template. This is the fix you should reach for: keep user data in the render context of a fixed
+template and no injection is possible.
+
+**Defence-in-depth — restricted render (`POST /notifications/preview/restricted`).** For the case where
+a product *genuinely must* let users author template logic, the secure app also offers a sandboxed
+path (`jinja2.sandbox.SandboxedEnvironment`) with constrained attribute access, strict undefined
+handling, and an **explicit allowlist of exposed names** (only `order`). An allowlisted body such as
+`{% if order.status == 'shipped' %}…{% endif %}` renders; a disallowed construct — a non-exposed name
+or an object-graph traversal — is rejected with a generic response that does not enumerate the
+permitted names, and each rejection emits exactly one generic structured JSON audit event (with a
+correlation id echoed to the client, no payload, no secret, no token).
+
+> This restricted path is a **secondary mitigation, not the primary control.** Template-engine sandbox
+> escapes are a recurring vulnerability class, so untrusted template authoring should be avoided
+> wherever the data-into-context approach is sufficient.
 
 ## Safety
 
