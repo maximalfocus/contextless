@@ -105,7 +105,15 @@ correlation id echoed to the client, no payload, no secret, no token).
 All organizations, users, customers, orders, tokens, and "secrets" in this repository are fictional.
 The demonstration is non-destructive and performs no network egress beyond loopback.
 
+## Contributing & security
+
+Contributions are welcome — see [`CONTRIBUTING.md`](CONTRIBUTING.md). The intentionally vulnerable app
+is deliberate; please read [`SECURITY.md`](SECURITY.md), which separates the demonstrated SSTI from
+unintended vulnerabilities and gives a private reporting path for the latter.
+
+This project is **not hosted or operated as a service** and makes **no production-readiness, support, or
+compatibility promise**.
+
 ## License
 
-This project will be released under the **MIT License**; the `LICENSE` file is added as part of the
-publication-preparation change.
+Licensed under the [MIT License](LICENSE) — SPDX `MIT`.
