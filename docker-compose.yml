@@ -9,6 +9,7 @@
 # The vulnerable app is intentionally insecure LOCAL EDUCATIONAL code. Starting it
 # needs TWO deliberate actions — its opt-in profile AND ALLOW_VULNERABLE_DEMO=true:
 #   ALLOW_VULNERABLE_DEMO=true docker compose --profile vulnerable up --build vulnerable vuln-proxy
+#   ALLOW_VULNERABLE_DEMO=true docker compose --profile compare run --build --rm compare  # both apps
 #   ALLOW_VULNERABLE_DEMO=true docker compose --profile vuln-demo run --build --rm vuln-demo
 #
 # The image copies source in at build time, so pass --build after editing code.
@@ -121,6 +122,28 @@ services:
     networks:
       - novnet
     command: ["python", "-m", "demo.vulnerable_demo"]
+
+  # Full side-by-side comparison over real HTTP: the CLI `compare` mode against
+  # BOTH apps. Reaches the secure app (default network) and the vulnerable app
+  # (internal network). Same two opt-in actions as the vulnerable service.
+  compare:
+    build:
+      context: .
+    image: contextless:dev
+    profiles: ["compare"]
+    depends_on:
+      secure:
+        condition: service_healthy
+      vulnerable:
+        condition: service_healthy
+    environment:
+      - ALLOW_VULNERABLE_DEMO=${ALLOW_VULNERABLE_DEMO:-}
+    networks:
+      - default
+      - novnet
+    command:
+      ["python", "-m", "contextless.cli", "compare",
+       "--secure-url", "http://secure:8000", "--vulnerable-url", "http://vulnerable:8001"]
 
   # Verification boundary: identical command locally and in GitHub Actions.
   verify:
