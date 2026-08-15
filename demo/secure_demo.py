@@ -39,6 +39,14 @@ def _preview(client: httpx.Client, token: str, body: str) -> httpx.Response:
     )
 
 
+def _restricted(client: httpx.Client, token: str, body: str) -> httpx.Response:
+    return client.post(
+        "/notifications/preview/restricted",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"body": body, "order_reference": ORDER_REFERENCE},
+    )
+
+
 def main() -> int:
     failures: list[str] = []
 
@@ -66,6 +74,30 @@ def main() -> int:
                 failures.append(f"{label}: integration secret leaked")
             if "uid=" in rendered:
                 failures.append(f"{label}: command execution reached (found uid=)")
+
+        # Defence-in-depth restricted-render path: sandbox + explicit name allowlist.
+        print("\nrestricted-render path (defence-in-depth: sandbox + name allowlist)")
+        print("-" * 90)
+        allowed = _restricted(client, GLOBEX_TOKEN, "{{ order.number }} / {{ order.status }}")
+        allowed.raise_for_status()
+        print(f"{'allowlisted body':<36} | {allowed.json()['rendered']}")
+        if allowed.json()["rendered"] != "1001 / shipped":
+            failures.append("restricted allowlisted body did not render as expected")
+
+        rejected = _restricted(client, GLOBEX_TOKEN, "{{ config.integration_api_key }}")
+        correlation = rejected.headers.get("X-Correlation-ID", "")
+        print(
+            f"{'disallowed construct':<36} | HTTP {rejected.status_code} "
+            f"(rejected, correlation {correlation[:8]}…)"
+        )
+        if rejected.status_code != 400:
+            failures.append(
+                f"restricted disallowed construct returned {rejected.status_code}, want 400"
+            )
+        if FICTIONAL_INTEGRATION_API_KEY in rejected.text:
+            failures.append("restricted rejection leaked the integration secret")
+        if not correlation:
+            failures.append("restricted rejection missing correlation id")
 
         # Authentication is generic: an unknown token is a plain 401.
         bad = _preview(client, "not-a-real-token", BENIGN_BODY)
