@@ -8,10 +8,13 @@ input as **data** in the render **context** of a fixed template instead of compi
 This project is educational code intended to run only on a developer's machine. It hosts nothing,
 deploys nothing, and makes no production-readiness claim.
 
-> **Status:** the secure baseline is complete — both the primary data-into-context endpoint and the
-> defence-in-depth restricted-render path. The opt-in vulnerable contrast app, the SSTI escalation
-> ladder, the comparison CLI, the full regression matrix, and the complete walkthrough are being added
-> in subsequent changes.
+> **Status:** the secure baseline, the opt-in vulnerable contrast app, the SSTI escalation ladder, the
+> comparison CLI, the regression matrix, and the [walkthrough](docs/WALKTHROUGH.md) are all in place.
+> Repository publication is prepared in a subsequent change.
+
+**New here? Start with the [walkthrough](docs/WALKTHROUGH.md).** It explains data-versus-template-source,
+maps the terminology (SSTI · OWASP A03:2021 · CWE-1336 · CWE-94), and walks the whole demo in five
+minutes.
 
 ## Requirements
 
@@ -23,9 +26,11 @@ Only **Docker** (with the Docker Compose plugin). No host Python, `uv`, or proje
 # Run the secure API on http://127.0.0.1:8000 (loopback only)
 docker compose up --build secure
 
-# One-shot: seed fresh deterministic state, exercise the secure app over real
-# localhost HTTP, print the outcome, and exit
+# One-shot secure demo over real localhost HTTP
 docker compose run --build --rm demo
+
+# Full side-by-side comparison of BOTH apps (two opt-in actions — see below)
+ALLOW_VULNERABLE_DEMO=true docker compose --profile compare run --build --rm compare
 
 # Verification boundary — ruff + mypy + pytest, identical locally and in CI
 docker compose run --build --rm verify
@@ -34,7 +39,28 @@ docker compose run --build --rm verify
 docker compose down -v
 ```
 
-The image copies source in at build time, so pass `--build` after editing code.
+The image copies source in at build time, so pass `--build` after editing code. While a service is up,
+its OpenAPI docs are at `/docs` (`http://127.0.0.1:8000/docs`, `http://127.0.0.1:8001/docs`).
+
+## The vulnerable app (opt-in, local only)
+
+> ⚠️ **The vulnerable application is intentionally insecure local educational code. Never deploy it.**
+
+It compiles user input as a template, so it demonstrates the full SSTI escalation ladder — expression
+evaluation, secret disclosure, and object-graph traversal reaching `os.popen('id')` for in-container
+code execution. To contain it, starting it needs **two deliberate actions** — its opt-in Compose
+profile **and** `ALLOW_VULNERABLE_DEMO=true` — and it runs non-root with all capabilities dropped,
+`no-new-privileges`, a read-only root filesystem, and **no network egress**. The code-execution proof
+is confined to the single read-only `id` command; destructive, persistent, and egress-producing
+payloads are out of scope by design.
+
+```sh
+# Vulnerable app for manual exploration on 127.0.0.1:8001
+ALLOW_VULNERABLE_DEMO=true docker compose --profile vulnerable up --build vulnerable vuln-proxy
+
+# Prove the container hardening + no egress
+ALLOW_VULNERABLE_DEMO=true bash scripts/verify-vulnerable-hardening.sh
+```
 
 Interactive API docs are available at `http://127.0.0.1:8000/docs` while the secure service is up.
 
